@@ -1,0 +1,12 @@
+**/__pycache__
+/aist_plusplus_final
+/aistplusplus_api
+save/
+/aist_plusplus_final.tar.gz
+/aistplusplus_api.tar.gz
+/data.tar.gz
+/save.tar.gz
+/smpl
+
+/data/*
+!/data/dataloader.py

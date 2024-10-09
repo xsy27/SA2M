@@ -1,0 +1,31 @@
+{
+    "arch": {
+        "decoder": "trans_enc",
+        "latent_dim": 512,
+        "ff_size": 1024,
+        "num_heads": 8,
+        "num_layers": 4
+    },
+    "dataset": {
+        "pose_vec": "complex",
+        "clip_len": 240,
+        "move": 8,
+        "rot_rep": "6d",
+        "njoints": 24,
+        "nfeats": 6,
+        "cond": "audio",
+        "smpl_dir": "smpl"
+    },
+    "diff": {
+        "noise_schedule": "cosine",
+        "diffusion_steps": 4,
+        "sigma_small": true
+    },
+    "trainer": {
+        "epoch": 500,
+        "lr": 0.0001,
+        "batch_size": 512,
+        "cond_mask_prob": 0.15,
+        "loss_terms": "111"
+    }
+}
