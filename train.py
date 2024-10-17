@@ -27,7 +27,7 @@ def train(config, resume, logger, tb_writer):
 
     train_dataloader, vec_len, audio_dim = prepare_train_dataloader(config, dtype=np_dtype)
     val_dataloader = prepare_val_dataloader(config, dtype=np_dtype)
-    print(audio_dim)
+    print(f'vec_len: {vec_len} | audio_dim: {audio_dim}')
     
     diffusion = create_gaussian_diffusion(config)
 

@@ -6,7 +6,7 @@ import torch.nn as nn
 
 class MotionDiffusion(nn.Module):
     def __init__(self, pose_vec, vec_len, audio_dim, clip_len=240,
-                 latent_dim=256, ff_size=1024, num_layers=4, num_heads=4, dropout=0.2,
+                 latent_dim=512, ff_size=1024, num_layers=4, num_heads=8, dropout=0.2,
                  ablation=None, activation="gelu", legacy=False, 
                  arch='trans_enc', cond_mask_prob=0.15, device=None):
         super().__init__()
@@ -68,8 +68,9 @@ class MotionDiffusion(nn.Module):
         self.output_process = OutputProcess(self.vec_len, self.latent_dim)
 
 
-    def forward(self, x, timesteps, music_feature):
+    def forward(self, x, timesteps, music_feature=None, y=None):
         bs, vec_len, nframes = x.shape
+        if y != None: music_feature = y['music']
 
         time_emb = self.embed_timestep(timesteps)  # [1, bs, L]
         audio_emb = self.embed_audio(music_feature) # [nframes, bs, L]
@@ -101,7 +102,7 @@ class MotionDiffusion(nn.Module):
         # keep_batch_idx = torch.rand(bs, device=past_motion.device) < (1-self.cond_mask_prob)
         # past_motion = past_motion * keep_batch_idx.view((bs, 1, 1, 1))
         
-        return self.forward(x, timesteps, music_feature)
+        return self.forward(x, timesteps, music_feature=music_feature)
 
 class MotionProcess(nn.Module):
     def __init__(self, vec_len, latent_dim):

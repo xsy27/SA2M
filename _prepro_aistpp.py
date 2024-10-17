@@ -234,9 +234,9 @@ def extract_acoustic_feature(audio, sr):
         tempogram,
         beats_one_hot, # 1
         # peaks_one_hot, # 1
-        # rms_energy, # 1
-        source_poss, # 3
-    ], axis=0) # 429
+        rms_energy, # 1
+        # source_poss, # 3
+    ], axis=0) # 427
 
     feature = feature.transpose(1, 0)
     # print(f'acoustic feature -> {feature.shape}')

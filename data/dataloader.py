@@ -220,7 +220,7 @@ def load_val_data_aist(data_dir, save_dir, interval, dtype=np.float32):
                 music_data.append(np_music)
                 motion_data.append(np_motion)
                 smpl_transs.append(np_smpl_trans)
-                masks.append(len(np_motion))
+                masks.append(np.ones(len(np_motion), dtype=bool))
             
             smpl_scalings.append(np_smpl_scaling)
             input_names.append(fname[:-5])
@@ -235,64 +235,49 @@ def load_val_data_aist(data_dir, save_dir, interval, dtype=np.float32):
 
     return music_data, motion_data, input_names, smpl_configs, masks
 
-def load_test_data_aist(data_dir, dtype=np.float32, move=8, wav_padding=0):
+def load_test_data_aist(data_dir, save_dir, interval, dtype=np.float32):
     tot = 0
     input_names = []
 
-    music_data, motion_data, smpl_configs = [], [], []
+    music_data, motion_data, smpl_configs, masks = [], [], [], []
     smpl_scalings, smpl_transs = [], []
     fnames = sorted(os.listdir(data_dir))
-    # print(fnames)
-    # fnames = fnames[:60]  # For debug
 
-    print("Loading AIST++ evaluation data")
+    print("Loading AIST++ test data...")
     for fname in tqdm(fnames):
         path = os.path.join(data_dir, fname)
         with open(path) as f:
-            #print(path)
+            # print(path)
             sample_dict = json.loads(f.read())
             np_music = np.array(sample_dict['music_array'], dtype=dtype)
+            np_motion = np.array(sample_dict['dance_array'], dtype=dtype)
             np_smpl_scaling = np.array(sample_dict['smpl_config'][0], dtype=dtype)
             np_smpl_trans = np.array(sample_dict['smpl_config'][1], dtype=dtype)
-            
-            if 'dance_array' in sample_dict:
-                np_motion = np.array(sample_dict['dance_array'], dtype=dtype)
 
-                assert(len(np_motion) == len(np_smpl_trans))
-                for kk in range((len(np_motion) // move + 1) * move - len(np_motion)):
-                    np_motion = np.append(np_motion, np_motion[-1:], axis=0)
-                for kk in range((len(np_smpl_trans) // move + 1) * move - len(np_smpl_trans)):
-                    np_smpl_trans = np.append(np_smpl_trans, np_smpl_trans[-1:], axis=0)
-
-                motion_data.append(np_motion)
-            # print('Music data shape: ', np_music.shape)
+            if interval is not None:
+                music_data.append(np_music[:interval])
+                motion_data.append(np_motion[:interval])
+                smpl_transs.append(np_smpl_trans[:interval])
+                masks.append(np.ones(interval, dtype=bool))
+                        
             else:
-                np_motion = None
-                motion_data = None
+                music_data.append(np_music)
+                motion_data.append(np_motion)
+                smpl_transs.append(np_smpl_trans)
+                masks.append(np.ones(len(np_motion), dtype=bool))
             
-            music_move = move
-            
-            # zero padding left
-            for kk in range(wav_padding):
-                np_music = np.append(np.zeros_like(np_music[-1:]), np_music, axis=0)
-            # fully devisable
-            for kk in range((len(np_music) // music_move + 1) * music_move - len(np_music) ):
-                np_music = np.append(np_music, np_music[-1:], axis=0)
-            # zero padding right
-            for kk in range(wav_padding):
-                np_music = np.append(np_music, np.zeros_like(np_music[-1:]), axis=0)
-
-            music_data.append(np_music)
+            smpl_scalings.append(np_smpl_scaling)
             input_names.append(fname[:-5])
 
-            smpl_scalings.append(np_smpl_scaling)
-            smpl_transs.append(np_smpl_trans)
-            # tot += 1
-            # if tot == 3:
-            #     break
+        # tot += 1
+        # if tot > 1:
+        #     break
     
     smpl_configs = [smpl_scalings, smpl_transs]
-    return music_data, motion_data, input_names, smpl_configs
+
+    save_gt(motion_data, input_names, '%s/%s/' % (save_dir, 'gt'))
+
+    return music_data, motion_data, input_names, smpl_configs, masks
 
 def prepare_train_dataloader(config, dtype=np.float32):
     train_music_data, train_motion_data, train_smpl_configs = load_train_data_aist(
@@ -321,15 +306,18 @@ def prepare_val_dataloader(config, dtype=np.float32):
     )
     return data_loader
 
-def prepare_test_dataloader(workers, music_data, motion_data, names, smpl_configs):
-    data = AudMoTestDataset(music_data, motion_data, names, smpl_configs)
+def prepare_test_dataloader(config, dtype=np.float32):
+    test_music_data, test_motion_data, test_names, test_smpl_configs, test_masks = load_test_data_aist(
+        config.test_data, config.save, config.dataset.clip_len, dtype=dtype)
+    vec_len, audio_dim = test_motion_data[0].shape[-1], test_music_data[0].shape[-1]
+    data = AudMoTestDataset(test_music_data, test_motion_data, test_names, test_smpl_configs, test_masks)
     data_loader = torch.utils.data.DataLoader(
         data,
-        num_workers=workers,
+        num_workers=config.workers,
         batch_size=1,
         shuffle=False
     )
-    return data_loader
+    return data_loader, vec_len, audio_dim
 
 def save_gt(motions, input_names, save_dir):
     x_start_poss = []

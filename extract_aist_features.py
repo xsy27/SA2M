@@ -27,15 +27,17 @@ parser.add_argument(
     default='smpl/',
     help='input local dictionary that stores SMPL data.')
 parser.add_argument(
-    '--save_dir',
+    '--save',
     type=str,
     default='data/aist_features_zero_start/',
     help='output local dictionary that stores features.')
+parser.add_argument(
+    '--split_test_file',
+    type=str,
+    default='aist_plusplus_final/splits/crossmodal_test.txt')
 FLAGS = parser.parse_args()
-    
 
 def main(seq_name, motion_dir):
-    print(seq_name)
     # Parsing SMPL 24 joints.
     # Note here we calculate `transl` as `smpl_trans/smpl_scaling` for 
     # normalizing the motion in generic SMPL model scale.    
@@ -54,16 +56,16 @@ def main(seq_name, motion_dir):
     # print(keypoints3d)
 
     features = extract_manual_features(keypoints3d)
-    np.save(os.path.join(FLAGS.save_dir, 'manual_features_new', seq_name+"_manual.npy"), features)
+    np.save(os.path.join(FLAGS.save, 'manual_features_new', seq_name+"_manual.npy"), features)
     features = extract_kinetic_features(keypoints3d)
-    np.save(os.path.join(FLAGS.save_dir, 'kinetic_features', seq_name+"_kinetic.npy"), features)
-    print (seq_name, "is done")
+    np.save(os.path.join(FLAGS.save, 'kinetic_features', seq_name+"_kinetic.npy"), features)
+    # print (seq_name, "is done")
 
 
 if __name__ == '__main__':
-    os.makedirs(FLAGS.save_dir, exist_ok=True)
-    os.makedirs(os.path.join(FLAGS.save_dir, 'kinetic_features'), exist_ok=True)
-    os.makedirs(os.path.join(FLAGS.save_dir, 'manual_features_new'), exist_ok=True)
+    os.makedirs(FLAGS.save, exist_ok=True)
+    os.makedirs(os.path.join(FLAGS.save, 'kinetic_features'), exist_ok=True)
+    os.makedirs(os.path.join(FLAGS.save, 'manual_features_new'), exist_ok=True)
     
     # Parsing data info.
     aist_dataset = AISTDataset(FLAGS.anno_dir)

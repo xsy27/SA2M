@@ -86,7 +86,7 @@ def export(motions, names, save_path, prefix=None):
 
         np_motions.append(np_motion_trans.reshape([n, 25*2]))
 
-    write2npy(np_motions, names, save_path)
+    write2npy(motion_datas, names, save_path)
     write2json(np_motions, names, save_path)
     visualize(names, save_path)
     img2video(save_path, prefix)
@@ -97,13 +97,13 @@ def write2npy(dances, dance_names, expdir):
     assert len(dances) == len(dance_names),\
         "number of generated dance != number of dance_names"
 
-    ep_path = os.path.join(expdir, "pkl")
+    ep_path = os.path.join(expdir, "npy")
         
     if not os.path.exists(ep_path):
         os.makedirs(ep_path)
 
     # print("Writing Json...")
-    for i in tqdm(range(len(dances)),desc='Generating Jsons'):
+    for i in tqdm(range(len(dances)),desc='Generating npy'):
         np_motion = dances[i]
         npy_data = {"position": np_motion}
 
@@ -195,6 +195,8 @@ def img2video(expdir, prefix, audio_path=None):
             os.system(cmd)
             cmd_audio = f"ffmpeg -i {video_dir}/{name}.{prefix}.mp4 -i {audio_dir_} -map 0:v -map 1:a -c:v copy -shortest -y {video_dir}/{name_w_audio}.{prefix}.mp4 -loglevel quiet"
             os.system(cmd_audio)
+            cmd_rm = f"rm {video_dir}/{name}.{prefix}.mp4"
+            os.system(cmd_rm)
         else:
             cmd = f"ffmpeg -r 60 -i {image_dir}/{dance}/frame%06d.png -vb 20M -vcodec mpeg4 -y {video_dir}/{name}.{prefix}.mp4 -loglevel quiet"
             os.system(cmd)
