@@ -6,3 +6,6 @@ save/
 
 /data/*
 !/data/*.py
+
+/eval/*
+!/eval/*.py
