@@ -13,6 +13,7 @@ from utils.visualizer import export
 import shutil
 from data.dataloader import prepare_test_dataloader
 from diffusion.create_diffusion import create_gaussian_diffusion
+from eval.calc_metrics import calc_save_feats, calc_metrics
 
 def predict(config, dataloader, model, diffusion):
     bs = 1
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_data', type=str, default='data/aistpp_test_wav', help='input local dictionary for AIST++ evaluation dataset.')
     parser.add_argument('--smpl', type=str, default='smpl', help='input local dictionary that stores SMPL data.')
     parser.add_argument('--best', type=str, default='save/gamma_aistpp_train_wav/best.pt', help='input local dictionary that stores the best model parameters.')
-    parser.add_argument('--save', type=str, default='data/aistpp_evaluation', help='input local dictionary that stores the output data.')
+    parser.add_argument('--save', type=str, default='eval/aistpp_evaluation', help='input local dictionary that stores the output data.')
     config = parser.parse_args()
     config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     config.workers = 4
@@ -95,3 +96,15 @@ if __name__ == '__main__':
     diffusion = create_gaussian_diffusion(config)
     
     predict(config, test_data_loader, model, diffusion)
+
+    gt_root = 'eval/aist_features_zero_start'
+    pred_root = 'eval/aistpp_evaluation/pred'
+    calc_save_feats(pred_root)
+
+    result_path = 'eval/aistpp_evaluation/metrics.txt'
+    result = calc_metrics(gt_root, pred_root)
+    with open(result_path, 'a') as f:
+        f.write(str(result))
+        f.write('\n')
+
+    print(result)

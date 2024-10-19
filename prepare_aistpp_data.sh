@@ -1,5 +1,6 @@
 #!/bin/sh
-python _prepro_aistpp.py
+python ./data/_prepro_aistpp.py
+python ./eval/extract_aist_features
 
 # for actor critic
 # python _prepro_aistpp_music.py --store_dir data/aistpp_music_feat --sampling_rate 30720

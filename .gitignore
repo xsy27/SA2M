@@ -2,12 +2,7 @@
 /aist_plusplus_final
 /aistplusplus_api
 save/
-/aist_plusplus_final.tar.gz
-/aistplusplus_api.tar.gz
-/data.tar.gz
-/save.tar.gz
 /smpl
-/smpl.tar.gz
 
 /data/*
-!/data/dataloader.py
+!/data/*.py
