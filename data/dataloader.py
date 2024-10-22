@@ -7,6 +7,8 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from utils.visualizer import export
+from pytorch3d import transforms
+from utils.nn_transforms import repr6d2quat
 
 class AudMoTrainDataset(Dataset):
     def __init__(self, musics, motions, smpl_configs, interval):
@@ -321,14 +323,20 @@ def prepare_test_dataloader(config, dtype=np.float32):
 
 def save_gt(motions, input_names, save_dir):
     x_start_poss = []
+    x_start_rots = []
     for motion in motions:
-        interval = motion.shape[0]
-        x_start_pos = np.concatenate((motion[..., 3:6], motion[..., 12:81]), axis=-1).reshape(interval, 24, 3)
-        global_shift = np.expand_dims(x_start_pos[0, 0, :].copy(), axis=(0, 1))
-        x_start_pos = x_start_pos - np.tile(global_shift, (interval, 24, 1)) # [bs, nframes, 24, 3]
+        nframes = motion.shape[0]
+        x_start_pos = np.concatenate((motion[..., 3:6], motion[..., 12:81]), axis=-1).reshape(nframes, 24, 3)
+        # global_shift = np.expand_dims(x_start_pos[0, 0, :].copy(), axis=(0, 1))
+        # x_start_pos = x_start_pos - np.tile(global_shift, (nframes, 24, 1)) # [bs, nframes, 24, 3]
         x_start_poss.append(x_start_pos)
 
-    export(x_start_poss, input_names, save_dir, prefix='gt')
+        motion = torch.from_numpy(motion)
+        x_start_rot = transforms.quaternion_to_axis_angle(repr6d2quat(torch.cat((motion[..., 6:12], motion[..., 150:288]), dim=-1).view(nframes, 24, 6))).float()
+        x_start_rot = x_start_rot.detach().cpu().numpy()
+        x_start_rots.append(x_start_rot)
+
+    export(x_start_poss, x_start_rots, input_names, save_dir, prefix='gt')
 
 if __name__ == '__main__':
 

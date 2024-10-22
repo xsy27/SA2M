@@ -1,4 +1,4 @@
-### Bailando
+### Bailando, MDM
 
 import os
 from tqdm import tqdm
@@ -9,33 +9,30 @@ from PIL import Image
 import cv2
 import numpy as np
 from utils.keypoint2img import read_keypoints
+import matplotlib
+import matplotlib.pyplot as plt
+import mpl_toolkits.mplot3d.axes3d as p3
+from textwrap import wrap
+from matplotlib.animation import FuncAnimation
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 pose_keypoints_num = 25
 height = 540
 width = 960
 
-def export(motions, names, save_path, prefix=None):
+def export(motions, rot_motions, names, save_path, prefix=None):
+    assert len(names) == len(motions)
+    assert len(rot_motions) == len(motions)
     # motions: [nmotions, nframes, 24, 3]
     np_motions = []
-    np_motion_original = []
     motion_datas = []
 
     for idx in range(len(motions)):
         np_motion = motions[idx]
-
-        # if args.use_mean_pose:
-        #     print('We use mean pose!')
-        #     np_motion += mean_pose
-        # root = np_motion[:, 0, :]
-        # root = np.expand_dims(root, axis=1)
-        # np_motion = np_motion + np.tile(root, (1, 24, 1))
-        # np_motion[:, 0, :] = root.reshape(-1, 3)
-
         motion_datas.append(np_motion)
-        # write2pkl(np_motion, dance_names[i], config.testing, expdir, epoch, rotmat=True)
 
-        # np_motion[2:-2] = (np_motion[:-4] + np_motion[1:-3] + np_motion[2:-2] +  np_motion[3:-1] + np_motion[4:]) / 5.0
-        np_motion_original.append(np_motion)
+        global_shift = np.expand_dims(np_motion[0, 0, :].copy(), axis=(0, 1))
+        np_motion -= np.tile(global_shift, (np_motion.shape[0], 24, 1))
 
         n, njoints, nfeats = np_motion.shape
         # np_motion2 = np_motion[:, :, :2] / 2 - 0.5
@@ -86,10 +83,31 @@ def export(motions, names, save_path, prefix=None):
 
         np_motions.append(np_motion_trans.reshape([n, 25*2]))
 
+    write2rotnpy(rot_motions, names, save_path)
     write2npy(motion_datas, names, save_path)
-    write2json(np_motions, names, save_path)
-    visualize(names, save_path)
-    img2video(save_path, prefix)
+    # write2json(np_motions, names, save_path)
+    # visualize(names, save_path)
+    # img2video(save_path, prefix)
+    visualize3d(save_path, prefix, names, motion_datas)
+
+def write2rotnpy(dances, dance_names, expdir):
+    # print(len(dances))
+    # print(len(dance_names))
+    assert len(dances) == len(dance_names),\
+        "number of generated dance != number of dance_names"
+
+    ep_path = os.path.join(expdir, "rotnpy")
+        
+    if not os.path.exists(ep_path):
+        os.makedirs(ep_path)
+
+    # print("Writing Json...")
+    for i in tqdm(range(len(dances)),desc='Generating rot npy'):
+        np_motion = dances[i]
+        npy_data = {"rotation": np_motion}
+
+        dance_path = os.path.join(ep_path, dance_names[i])
+        np.save(dance_path, npy_data)
 
 def write2npy(dances, dance_names, expdir):
     # print(len(dances))
@@ -131,15 +149,6 @@ def write2json(dances, dance_names, expdir):
             frame_dict = {'version': 1.2}
             # 2-D key points
             pose_keypoints_2d = []
-            # Random values for the below key points
-            face_keypoints_2d = []
-            hand_left_keypoints_2d = []
-            hand_right_keypoints_2d = []
-            # 3-D key points
-            pose_keypoints_3d = []
-            face_keypoints_3d = []
-            hand_left_keypoints_3d = []
-            hand_right_keypoints_3d = []
 
             keypoints = dances[i][j]
             for keypoint in keypoints:
@@ -149,14 +158,7 @@ def write2json(dances, dance_names, expdir):
                 pose_keypoints_2d.extend([x, y, score])
 
             people_dicts = []
-            people_dict = {'pose_keypoints_2d': pose_keypoints_2d,
-                           'face_keypoints_2d': face_keypoints_2d,
-                           'hand_left_keypoints_2d': hand_left_keypoints_2d,
-                           'hand_right_keypoints_2d': hand_right_keypoints_2d,
-                           'pose_keypoints_3d': pose_keypoints_3d,
-                           'face_keypoints_3d': face_keypoints_3d,
-                           'hand_left_keypoints_3d': hand_left_keypoints_3d,
-                           'hand_right_keypoints_3d': hand_right_keypoints_3d}
+            people_dict = {'pose_keypoints_2d': pose_keypoints_2d}
             people_dicts.append(people_dict)
             frame_dict['people'] = people_dicts
             frame_json = json.dumps(frame_dict)
@@ -186,20 +188,18 @@ def img2video(expdir, prefix, audio_path=None):
             music_name = name + '.mp3'
             audio_dir = 'extra/'
         
+        cmd = f"ffmpeg -r 60 -i {image_dir}/{dance}/frame%06d.png -vb 20M -vcodec mpeg4 -y {video_dir}/{name}.{prefix}.mp4 -loglevel quiet"
+        os.system(cmd)
+        
         if music_name in music_names:
             # print('combining audio!')
             audio_dir_ = os.path.join(audio_dir, music_name)
             # print(audio_dir_)
             name_w_audio = name + "_audio"
-            cmd = f"ffmpeg -r 60 -i {image_dir}/{dance}/frame%06d.png -vb 20M -vcodec mpeg4 -y {video_dir}/{name}.{prefix}.mp4 -loglevel quiet"
-            os.system(cmd)
             cmd_audio = f"ffmpeg -i {video_dir}/{name}.{prefix}.mp4 -i {audio_dir_} -map 0:v -map 1:a -c:v copy -shortest -y {video_dir}/{name_w_audio}.{prefix}.mp4 -loglevel quiet"
             os.system(cmd_audio)
             cmd_rm = f"rm {video_dir}/{name}.{prefix}.mp4"
             os.system(cmd_rm)
-        else:
-            cmd = f"ffmpeg -r 60 -i {image_dir}/{dance}/frame%06d.png -vb 20M -vcodec mpeg4 -y {video_dir}/{name}.{prefix}.mp4 -loglevel quiet"
-            os.system(cmd)
 
 def visualize_json(fname_iter, image_dir, dance_path, dance_name, quant=None):
     j, fname = fname_iter
@@ -254,3 +254,105 @@ def visualize(names, expdir, quants=None, worker_num=4):
         pool.map(partial_func, enumerate(fnames))
         pool.close()
         pool.join()
+    
+def visualize3d(save, prefix, names, motions, figsize=(9.6, 6.4), fps=60, radius=3):
+
+    def init():
+        fig.suptitle(title, fontsize=8)
+    
+    def plot_xzPlane(minx, maxx, miny, minz, maxz):
+        ## Plot a plane XZ
+        verts = [
+            [minx, miny, minz],
+            [minx, miny, maxz],
+            [maxx, miny, maxz],
+            [maxx, miny, minz]
+        ]
+        xz_plane = Poly3DCollection([verts])
+        xz_plane.set_facecolor((0.5, 0.5, 0.5, 0.5))
+        ax.add_collection3d(xz_plane)
+    
+    def update(index):
+        ax.clear()
+        ax.set_xlim3d(-radius / 2, radius / 2)
+        ax.set_ylim3d(0, radius)
+        ax.set_zlim3d(-radius / 3., radius * 2 / 3.)
+        ax.grid(b=False)
+        ax.view_init(elev=120, azim=-90, roll=0)
+        ax.dist = 7.5
+
+        plot_xzPlane(2 * MINS[0], 2 * MAXS[0], 0, 2 * MINS[2], 2 * MAXS[2])
+        used_colors = colors
+
+        for i, (chain, color) in enumerate(zip(kinematic_tree, used_colors)):
+            if i < 5:
+                linewidth = 4.0
+            else:
+                linewidth = 2.0
+            ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth, color=color)
+
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_zticklabels([])
+    
+    video3d_dir = os.path.join(save, 'videos3d')
+    if not os.path.exists(video3d_dir):
+        os.makedirs(video3d_dir)
+    kinematic_tree = [
+        [0, 1, 4, 7, 10],
+        [0, 2, 5, 8, 11],
+        [0, 3, 6, 9, 12, 15],
+        [9, 13, 16, 18, 20, 22],
+        [9, 14, 17, 19, 21, 23]
+    ]
+    matplotlib.use('Agg')
+
+    for i, motion in enumerate(tqdm(motions, desc='Generating 3D animation')):
+        name = names[i].split('.')[0]
+        title = title = '\n'.join(wrap(name, 40))
+        data = motion.copy().reshape(len(motion), -1, 3) # [nframes, 24, 3]
+        data *= 1.3
+        assert (data.shape == motion.shape)
+
+        fig = plt.figure(figsize=figsize)
+        # plt.tight_layout()
+        ax = fig.add_subplot(projection='3d')
+        MINS = data.min(axis=0).min(axis=0)
+        MAXS = data.max(axis=0).max(axis=0)
+        init()
+        colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]  # GT color
+        colors_orange = ["#DD5A37", "#D69E00", "#B75A39", "#FF6D00", "#DDB50E"]  # Generation color
+        colors = colors_orange
+        if(prefix == 'gt'):
+            colors = colors_blue
+        
+        frame_num = data.shape[0]
+
+        height_offset = MINS[1]
+        data[:, :, 1] -= height_offset
+        trajec = data[:, 0, [0, 2]]
+
+        data[..., 0] -= data[:, 0:1, 0]
+        data[..., 2] -= data[:, 0:1, 2]
+
+        ani = FuncAnimation(fig, update, frames=frame_num, interval=240, repeat=False)
+        video3d_file_name = name + '.' + prefix + '.mp4'
+        video3d_file_path = os.path.join(video3d_dir, video3d_file_name)
+        ani.save(filename=video3d_file_path, writer="ffmpeg", fps=fps)
+
+        music_name = name[-9:-5] + '.wav'
+        audio_dir = "aist_plusplus_final/all_musics"
+        music_names = sorted(os.listdir(audio_dir))
+        
+        if music_name in music_names:
+            # print('combining audio!')
+            audio_dir_ = os.path.join(audio_dir, music_name)
+            # print(audio_dir_)
+            name_w_audio = name + "_audio"
+            cmd_audio = f"ffmpeg -i {video3d_file_path} -i {audio_dir_} -map 0:v -map 1:a -c:v copy -shortest -y {video3d_dir}/{name_w_audio}.{prefix}.mp4 -loglevel quiet"
+            os.system(cmd_audio)
+            cmd_rm = f"rm {video3d_dir}/{name}.{prefix}.mp4"
+            os.system(cmd_rm)
+
+        plt.close()

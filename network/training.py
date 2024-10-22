@@ -305,6 +305,7 @@ class MotionTrainingPortal(BaseTrainingPortal):
         self.model.training = False
         with torch.no_grad():
             pred = []
+            pred_rot = []
             fnames = []
             eval_losses = {}
 
@@ -320,8 +321,7 @@ class MotionTrainingPortal(BaseTrainingPortal):
                 assert model_output.shape == x_start.shape
 
                 if self.epoch % self.config.trainer.eval_freq == 0:
-                    model_output_rot = transforms.quaternion_to_axis_angle(
-                        repr6d2quat(torch.cat((model_output[..., 6:12], model_output[..., 150:288]), dim=-1).view(bs, nframes, 24, 6))) # [bs, nframes, 24, 3]
+                    model_output_rot = transforms.quaternion_to_axis_angle(repr6d2quat(torch.cat((model_output[..., 6:12], model_output[..., 150:288]), dim=-1).view(bs, nframes, 24, 6))).float() # [bs, nframes, 24, 3]
                     
                     for i in range(bs):
                         fname = data_config['name'][i]
@@ -330,10 +330,11 @@ class MotionTrainingPortal(BaseTrainingPortal):
                             body_pose=model_output_rot[i][:, 1:].float(),
                             transl=(data_config['smpl_trans'][i] / data_config['smpl_scaling'][i]).float(),
                             ).joints.cpu().detach().numpy()[:, 0:24, :]
-                        global_shift = np.expand_dims(model_output_pos[0, 0, :].copy(), axis=(0, 1))
-                        model_output_pos = model_output_pos - np.tile(global_shift, (nframes, 24, 1))
+                        # global_shift = np.expand_dims(model_output_pos[0, 0, :].copy(), axis=(0, 1))
+                        # model_output_pos = model_output_pos - np.tile(global_shift, (nframes, 24, 1))
 
                         pred.append(model_output_pos)
+                        pred_rot.append(model_output_rot[i].detach().cpu().numpy())
                         fnames.append(fname)
                 
                 for key_name in losses.keys():
@@ -350,5 +351,5 @@ class MotionTrainingPortal(BaseTrainingPortal):
             #     export(gt, fnames, '%s/%s/' % (self.save_dir, save_folder_name), 'gt')
             if self.epoch % self.config.trainer.eval_freq == 0:
                 common.mkdir('%s/%s' % (self.save_dir, save_folder_name))
-                export(pred, fnames, '%s/%s/' % (self.save_dir, save_folder_name), prefix='pred')
+                export(pred, pred_rot, fnames, '%s/%s/' % (self.save_dir, save_folder_name), prefix='pred')
         

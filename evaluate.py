@@ -18,6 +18,7 @@ from eval.calc_metrics import calc_save_feats, calc_metrics
 def predict(config, dataloader, model, diffusion):
     bs = 1
     pred = []
+    pred_rot = []
     fnames = []
 
     smpl = SMPL(model_path=config.smpl, gender='MALE', batch_size=bs).eval().to(config.device)
@@ -47,8 +48,7 @@ def predict(config, dataloader, model, diffusion):
             bs, nframes, vec_len = model_output.shape
             assert (nframes == config.dataset.clip_len)
 
-            model_output_rot = transforms.quaternion_to_axis_angle(
-                repr6d2quat(torch.cat((model_output[..., 6:12], model_output[..., 150:288]), dim=-1).view(bs, nframes, 24, 6))).float() # [bs, nframes, 24, 3]
+            model_output_rot = transforms.quaternion_to_axis_angle(repr6d2quat(torch.cat((model_output[..., 6:12], model_output[..., 150:288]), dim=-1).view(bs, nframes, 24, 6))).float() # [bs, nframes, 24, 3]
             for i in range(bs):
                 fname = data_config['name'][i]
                 model_output_pos = smpl.forward(
@@ -56,12 +56,11 @@ def predict(config, dataloader, model, diffusion):
                     body_pose=model_output_rot[i][:, 1:].float(),
                     transl=(data_config['smpl_trans'][i] / data_config['smpl_scaling'][i]).float(),
                     ).joints.cpu().detach().numpy()[:, 0:24, :]
-                global_shift = np.expand_dims(model_output_pos[0, 0, :].copy(), axis=(0, 1))
-                model_output_pos = model_output_pos - np.tile(global_shift, (nframes, 24, 1))
                 pred.append(model_output_pos)
+                pred_rot.append(model_output_rot[i].detach().cpu().numpy())
                 fnames.append(fname)
 
-    export(pred, fnames, '%s/%s/' % (config.save, 'pred'), prefix='pred')
+    export(pred, pred_rot, fnames, '%s/%s/' % (config.save, 'pred'), prefix='pred')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
