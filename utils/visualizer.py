@@ -83,36 +83,16 @@ def export(motions, rot_motions, names, save_path, prefix=None):
 
         np_motions.append(np_motion_trans.reshape([n, 25*2]))
 
-    write2rotnpy(rot_motions, names, save_path)
-    write2npy(motion_datas, names, save_path)
+    write2npy(motion_datas, rot_motions, names, save_path)
     # write2json(np_motions, names, save_path)
     # visualize(names, save_path)
     # img2video(save_path, prefix)
     visualize3d(save_path, prefix, names, motion_datas)
 
-def write2rotnpy(dances, dance_names, expdir):
+def write2npy(motions, rot_motions, motion_names, expdir):
     # print(len(dances))
     # print(len(dance_names))
-    assert len(dances) == len(dance_names),\
-        "number of generated dance != number of dance_names"
-
-    ep_path = os.path.join(expdir, "rotnpy")
-        
-    if not os.path.exists(ep_path):
-        os.makedirs(ep_path)
-
-    # print("Writing Json...")
-    for i in tqdm(range(len(dances)),desc='Generating rot npy'):
-        np_motion = dances[i]
-        npy_data = {"rotation": np_motion}
-
-        dance_path = os.path.join(ep_path, dance_names[i])
-        np.save(dance_path, npy_data)
-
-def write2npy(dances, dance_names, expdir):
-    # print(len(dances))
-    # print(len(dance_names))
-    assert len(dances) == len(dance_names),\
+    assert len(motions) == len(motion_names),\
         "number of generated dance != number of dance_names"
 
     ep_path = os.path.join(expdir, "npy")
@@ -121,12 +101,13 @@ def write2npy(dances, dance_names, expdir):
         os.makedirs(ep_path)
 
     # print("Writing Json...")
-    for i in tqdm(range(len(dances)),desc='Generating npy'):
-        np_motion = dances[i]
-        npy_data = {"position": np_motion}
+    for i in tqdm(range(len(motions)),desc='Generating npy'):
+        np_motion = motions[i]
+        np_rot_motion = rot_motions[i]
+        npy_data = {"position": np_motion, "rotation": np_rot_motion}
 
-        dance_path = os.path.join(ep_path, dance_names[i])
-        np.save(dance_path, npy_data)
+        motion_path = os.path.join(ep_path, motion_names[i])
+        np.save(motion_path, npy_data)
 
 def write2json(dances, dance_names, expdir):
     assert len(dances) == len(dance_names),\

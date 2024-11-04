@@ -3,6 +3,8 @@
 /aistplusplus_api
 save/
 /smpl
+/blender
+/*.out
 
 /data/*
 !/data/*.py
